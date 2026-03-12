@@ -3,7 +3,35 @@ from block_ids import BLOCK_NAMES
 from block_color import BLOCK_COLORS
 from PIL import Image
 
-#world save path
+#----------- helper functions -----------#
+
+#detect if chunk uses 128 or 256 world height
+#checks a specific block that should be bedrock in 128 world height and should not be in 256 world height
+def get_chunk_height(blocks):
+    if blocks[128] == 7:
+        return 128
+    return 256
+
+#grab block id of array given coords and (world height 128 or 256)
+def get_block(blocks, x, y, z, height):
+    return blocks[y + z * height + x * height * 16]
+
+
+#loops down from top y coordinate to bottom (at x, z) finding first non air block (needs world height limit)
+def get_top_block(blocks, x, z, height):
+    for y in range(height - 1, -1, -1):
+        block_id = get_block(blocks, x, y, z, height)
+        if block_id != 0:
+            return block_id
+    return 0
+
+#----------- ---------------- -----------#
+
+
+
+
+
+#WORLD SAVE PATH
 savepath = "/home/arcadianvulture/chunk-renderer/world"
 
 
@@ -31,11 +59,45 @@ z_coords = [z[1] for z in chunks]
 zmin = (min(z_coords))
 zmax = (max(z_coords))
 
-xwidth = abs(xmax-xmin)
-zwidth = abs(zmax-zmin)
+xwidth = xmax-xmin + 1
+zwidth = zmax-zmin + 1
 
 #create 2d image of width and height of worldsave
-img = Image.new(mode='RGB',size=(xwidth,zwidth))
+img = Image.new(mode='RGB',size=(xwidth*16,zwidth*16))
+
+
+for cx, cz, path in chunks:
+
+    #put usable chunk data in array "blocks"
+    #format:    blocks[0] = (byte of block id)
+    with gzip.open(path) as f:
+        data = f.read()
+    idx = data.find(b'Blocks')
+    blocksStart = idx + 10
+    blocks = data[blocksStart:blocksStart + 65536]
+
+    #get height (256 or 128...use different indexing methods)
+    height = get_chunk_height(blocks)
+
+
+    for x in range(16):
+        for z in range(16):
+            block_id = get_top_block(blocks, x, z, height)
+            color = BLOCK_COLORS.get(block_id, (255, 0, 255))
+
+            img.putpixel(((cx-xmin)*16+x,(cz-zmin)*16+z), color)
+
+
+img.save('outputs/test1.png')
+
+
+
+
+
+
+
+
+
 
 #put invidual file in data var
 
@@ -56,39 +118,6 @@ img = Image.new(mode='RGB',size=(xwidth,zwidth))
 # blocksStart = idx + 10
 # #blocks is chunk file from start index to end
 # blocks = data[blocksStart:blocksStart + 65536]
-
-
-
-
-
-#----------- functions -----------#
-
-#detect if chunk uses 128 or 256 world height
-#checks a specific block that should be bedrock in 128 world height and should not be in 256 world height
-def get_chunk_height(blocks):
-    if blocks[128] == 7:
-        return 128
-    return 256
-
-#grab block id of array given coords and (world height 128 or 256)
-def get_block(blocks, x, y, z, height):
-    return blocks[y + z * height + x * height * 16]
-
-
-#loops down from top y coordinate to bottom (at x, z) finding first non air block (needs world height limit)
-def get_top_block(blocks, x, z, height):
-    for y in range(height - 1, -1, -1):
-        block_id = get_block(blocks, x, y, z, height)
-        if block_id != 0:
-            return block_id
-    return 0
-
-#----------- --------- -----------#
-
-
-
-
-
 
 
 
