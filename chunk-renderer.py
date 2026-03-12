@@ -1,16 +1,67 @@
-import gzip
+import os, gzip, re
 from block_ids import BLOCK_NAMES
 from block_color import BLOCK_COLORS
 from PIL import Image
 
-with gzip.open('./test_chunk_data/c.0.-1s.dat','rb') as f:
-    data = f.read()
+#world save path
+savepath = "/home/arcadianvulture/chunk-renderer/world"
 
-idx = data.find(b'Blocks')
-blocksStart = idx + 10
-blocks = data[blocksStart:blocksStart + 65536]
-img = Image.new('RGB', (16,16))
 
+#==================================================================================
+#create array of tuplets
+#format:  chunks[0][(x,z,path)]         chunks[0][1] gives 0th element z coordinate
+#==================================================================================
+chunks = []
+for root, dirs, files in os.walk(savepath):
+    for f in files:
+        if f.startswith('c.') and f.endswith ('.dat'):
+            parts = f.split('.')
+            x = int(parts[1], 36)
+            z = int(parts[2], 36)
+            path = os.path.join(root, f)
+            chunks.append((x, z, path))
+
+#----------------------------------------------------------------------------------
+#get image size
+#----------------------------------------------------------------------------------
+x_coords = [x[0] for x in chunks]
+xmin = (min(x_coords))
+xmax = (max(x_coords))
+z_coords = [z[1] for z in chunks]
+zmin = (min(z_coords))
+zmax = (max(z_coords))
+
+xwidth = abs(xmax-xmin)
+zwidth = abs(zmax-zmin)
+
+#create 2d image of width and height of worldsave
+img = Image.new(mode='RGB',size=(xwidth,zwidth))
+
+#put invidual file in data var
+
+#open chunk file, name it "f", and use "f.read()", setting data variable to content in file
+
+# with gzip.open('./test_chunk_data/c.0.-1s.dat','rb') as f:
+#     data = f.read()
+
+
+
+
+
+#create array of usable chunk data (not parsed)
+
+#index to start searching chunk data  (first 10 chars are text/info)
+
+# idx = data.find(b'Blocks')
+# blocksStart = idx + 10
+# #blocks is chunk file from start index to end
+# blocks = data[blocksStart:blocksStart + 65536]
+
+
+
+
+
+#----------- functions -----------#
 
 #detect if chunk uses 128 or 256 world height
 #checks a specific block that should be bedrock in 128 world height and should not be in 256 world height
@@ -32,20 +83,35 @@ def get_top_block(blocks, x, z, height):
             return block_id
     return 0
 
+#----------- --------- -----------#
 
 
-height = get_chunk_height(blocks)
-for x in range(16):
-    for z in range(16):
-        block_id = get_top_block(blocks, x, z, height)
-        if block_id != 0:
-            #print(block_id)
-            #print('done')
-            color = BLOCK_COLORS.get(block_id, (255, 0, 255))
-            img.putpixel((x,z), color)
+
+
+
+
+
+
+
+#find height of current chunk
+
+# height = get_chunk_height(blocks)
+
+#create image with RGB color space, 16x16 pixels
+# img = Image.new(mode='RGB', size=(16,16))
+
+
+# for x in range(16):
+#     for z in range(16):
+#         block_id = get_top_block(blocks, x, z, height)
+#         if block_id != 0:
+#             #print(block_id)
+#             #print('done')
+#             color = BLOCK_COLORS.get(block_id, (255, 0, 255))
+#             img.putpixel((x,z), color)
 
                
-img.save('outputs/output.png')
+# img.save('outputs/output.png')
 
 
 
