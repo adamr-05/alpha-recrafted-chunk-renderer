@@ -7,6 +7,7 @@ BLOCK_NAMES = {
     5: "planks",
     6: "sapling",
     7: "bedrock",
+
     8: "waterMoving",
     9: "waterStill",
     10: "lavaMoving",
@@ -15,6 +16,7 @@ BLOCK_NAMES = {
     13: "gravel",
     14: "oreGold",
     15: "oreIron",
+
     16: "oreCoal",
     17: "wood",
     18: "leaves",
@@ -23,6 +25,7 @@ BLOCK_NAMES = {
     21: "coalBlock",
     22: "redstoneBlock",
     23: "cobWeb",
+
     24: "plantBlue",
     25: "lamp",
     26: "lampLit",
@@ -31,11 +34,13 @@ BLOCK_NAMES = {
     29: "coral",
     30: "deadBush",
     31: "coloredBricks",
+
     32: "signHanging",
     35: "cloth",
     37: "plantYellow",
     38: "plantRed",
     39: "mushroomBrown",
+
     40: "mushroomRed",
     41: "blockGold",
     42: "blockSteel",
@@ -44,6 +49,7 @@ BLOCK_NAMES = {
     45: "brick",
     46: "tnt",
     47: "bookshelf",
+
     48: "cobblestoneMossy",
     49: "obsidian",
     50: "torch",
@@ -52,6 +58,8 @@ BLOCK_NAMES = {
     53: "stairCompactWood",
     54: "chest",
     55: "redstoneWire",
+    
+
     56: "oreDiamond",
     57: "blockDiamond",
     58: "workbench",
@@ -60,6 +68,7 @@ BLOCK_NAMES = {
     61: "stoneOvenIdle",
     62: "stoneOvenActive",
     63: "signStanding",
+
     64: "doorWood",
     65: "ladder",
     66: "minecartTrack",
@@ -68,6 +77,7 @@ BLOCK_NAMES = {
     69: "lever",
     70: "pressurePlateStone",
     71: "doorSteel",
+
     72: "pressurePlateWood",
     73: "oreRedstone",
     74: "oreRedstoneGlowing",
@@ -76,6 +86,7 @@ BLOCK_NAMES = {
     77: "button",
     78: "snow",
     79: "ice",
+
     80: "blockSnow",
     81: "cactus",
     82: "blockClay",
