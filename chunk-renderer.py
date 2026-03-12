@@ -21,7 +21,7 @@ def get_block(blocks, x, y, z, height):
 def get_top_block(blocks, x, z, height):
     for y in range(height - 1, -1, -1):
         block_id = get_block(blocks, x, y, z, height)
-        if block_id != 0:
+        if block_id not in transp:
             return block_id
     return 0
 
@@ -34,6 +34,8 @@ def get_top_block(blocks, x, z, height):
 #WORLD SAVE PATH
 savepath = "/home/arcadianvulture/chunk-renderer/world"
 
+#transparent blocks to skip         to see torches add/remove 50
+transp = {0, 6, 24, 30, 32, 37, 38, 39, 40, 50, 55, 63, 65, 66, 68, 69, 75, 76, 77}
 
 #==================================================================================
 #create array of tuplets
