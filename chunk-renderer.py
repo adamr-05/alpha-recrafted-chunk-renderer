@@ -1,4 +1,4 @@
-import os, gzip, re
+import os, gzip
 from block_ids import BLOCK_NAMES
 NAME_TO_ID = {v: k for k, v in BLOCK_NAMES.items()}
 from block_color import BLOCK_COLORS
@@ -12,7 +12,7 @@ from PIL import Image, ImageEnhance
 #==========================
 
 #WORLD SAVE PATH
-savepath = "/home/arcadianvulture/chunk-renderer/world"
+currentsavepath = "/home/arcadianvulture/chunk-renderer/world"
 
 #transparent blocks to skip         to see torches add/remove 50
 transp_pixels = {0, 6, 24, 30, 32, 37, 38, 39, 40, 50, 55, 63, 65, 66, 68, 69, 75, 76, 77}
@@ -30,25 +30,6 @@ layer_textures = {6, 18, 20, 23, 24, 27, 30, 37, 38, 39, 40, 50, 52, 55, 59, 66,
 #=========================================
 #----------- helper functions -----------#
 #=========================================
-
-
-#get the block texture given a block id
-#opens the terrain.png image and uses an indexing map to get location, calculates topLeft and bottomRight pixels, and crops new iamge
-
-def get_block_texture(block_id):
-    with Image.open("terrain.png") as im:
-        texindex = BLOCK_TEXTURES_TOP[block_id]
-        trow = texindex // 16
-        tcol = texindex % 16
-        pixelx = tcol*16
-        pixely = trow*16
-        topLeft = (pixelx, pixely)
-        pixelx2 = pixelx + 16
-        pixely2 = pixely + 16
-        bottomRight = (pixelx2, pixely2)
-        cropTuple = topLeft + bottomRight
-        blockTexture = im.crop(cropTuple)
-        return blockTexture
 
 
 #detect if chunk uses 128 or 256 world height
@@ -95,7 +76,6 @@ def get_top_view_blocks(blocks, x, z, height, skipTextures, transpTextures):
     return 0, 0, 0
 
 
-
 #create array of tuplets with all chunks
 #format:  chunks[0][(x,z,path)]         chunks[0][1] gives 0th element z coordinate
 
@@ -126,13 +106,15 @@ def bounding_box_chunks(chunks):
 
 
 #returns width given max and min
+
 def get_width(max,min):
     width = (max - min) + 1
     return width
 
 
 #open chunk file and extract usable data
-        #every byte is a block id
+#every byte is a block id
+
 def load_chunk_blocks(path):
     with gzip.open(path) as f:
         data = f.read()
@@ -143,7 +125,7 @@ def load_chunk_blocks(path):
     return blocks
 
 
-#creates a dictionary where block ID gives blocks top texture
+#creates a dictionary where block ID gives blocks topface texture
 def cropped_top_textures():
     croppedTextures = {}
     with Image.open("terrain.png") as terrainimage:
@@ -163,13 +145,46 @@ def cropped_top_textures():
     return croppedTextures
 
 
+def render_water_top_down(solidTexture, waterTexture, depthWater):
+    solidRGBA = solidTexture.copy().convert('RGBA')
+    blackBG = Image.new('RGBA', (16, 16), (0, 0, 0, 255))
+    
+    bottomFade = min(depthWater * 0.066, 1.0)
+    darkened = Image.blend(solidRGBA, blackBG, bottomFade)
+    
+    opaqueWater = Image.new('RGBA', (16, 16), (5, 10, 30, 255))
+    opaqueWater.paste(waterTexture, (0, 0), waterTexture)
+    
+    if depthWater > 14:
+        brightness = max(1 - (depthWater - 14) * 0.03, 0.05)
+        opaqueWater = ImageEnhance.Brightness(opaqueWater).enhance(brightness)
 
-#==========================================
-#----------- MAPPING FUNCTIONS -----------#
-#==========================================
+    waterRatio = min(0.50 + depthWater * 0.02, 0.98)
+    return Image.blend(darkened, opaqueWater, waterRatio)
+    
 
+
+
+
+
+
+
+
+
+
+
+
+#============================================================
+#-------------------- MAPPING FUNCTIONS --------------------#
+#============================================================
+
+
+
+#---------------------------------------
 #create map where every block is 1 pixel
-def create_pixel_map(transp_pixels):
+#---------------------------------------
+
+def create_pixel_map(savepath, transp_pixels):
     
     #using helper functions, get list of chunks and bounding box coordinates
     chunkdata = chunks_list(savepath)
@@ -206,152 +221,87 @@ def create_pixel_map(transp_pixels):
 
     img.save('outputs/test1.png')
     return
+
+
+
+
+
+
+#------------------------------------------------
+#create top-down world map using topface textures
+#transparent blocks, water depth added
+#------------------------------------------------
+
+def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax):
+
+    #get array of textures from block id & create list of all chunks
+    textures = cropped_top_textures()
+    fallback = Image.new('RGB', (16, 16), (255, 0, 255)) #if block has no texture -- magenta
+    chunkdata = chunks_list(savepath)
+
+
+    # Create bounding width for creating image using max and min x and z coordinates
+    render_chunks = [(cx, cz, path) for cx, cz, path in chunkdata if xmin <= cx <= xmax and zmin <= cz <= zmax]
+    rc_xmin = min(c[0] for c in render_chunks)
+    rc_xmax = max(c[0] for c in render_chunks)
+    rc_zmin = min(c[1] for c in render_chunks)
+    rc_zmax = max(c[1] for c in render_chunks)
+    width = (rc_xmax - rc_xmin + 1) * 256
+    height = (rc_zmax - rc_zmin + 1) * 256
+
+    #create image
+    img = Image.new('RGB', (width, height))
+
+
+    #loop through every file
+    for cx, cz, path in render_chunks:
+        #create usable array of chunkData and find worldHeight
+        blocks = load_chunk_blocks(path)
+        h = get_chunk_height(blocks)
+
+        #loop through all x and z coordinates in chunk
+        for x in range(16):
+            for z in range(16):
+                #get topview blocks for given x and z coordinate
+                solidBlockID, transpBlockID, depthWater = get_top_view_blocks(blocks, x, z, h, skipTextures, layerTextures)
+
+                #convert block IDs to textures
+                solidTexture = textures.get(solidBlockID, fallback)
+                transpTexture = textures.get(transpBlockID, fallback)
+                waterTexture = textures[8]
+                
+                #combine chunk coordinates (cx - rc_xmin)*16blocks*16pixels + block coordinates (x*16 pixels)
+                pastePosition = ((cx - rc_xmin) * 256 + x * 16, (cz - rc_zmin) * 256 + z * 16)
+                
+                #paste only solid texture if no water
+                if depthWater == 0:
+                    img.paste(solidTexture, (pastePosition))
+
+                #if water depth > 0, use water rendering function to combine solid texture below, water above, and darkness based on depth
+                elif depthWater > 0:
+                    blended = render_water_top_down(solidTexture, waterTexture, depthWater)
+                    img.paste(blended, pastePosition)
+                
+                #render transparent block on top of everything
+                if transpBlockID != 0:
+                    img.paste(transpTexture, pastePosition, transpTexture)
+
+    img.save('outputs/test_region.png')
+    return
+
+
+
+
+
+
+#=======================================================================================
+#------------------------------------   main   -----------------------------------------
 #=======================================================================================
 
+def main():
+    create_pixel_map(currentsavepath,transp_pixels)
+    create_texture_map(currentsavepath,skip_textures,layer_textures,0,60,-45,15)
+    return
 
 
-
-"""
-chunkdata = chunks_list(savepath)
-bounds = bounding_box_chunks(chunkdata)
-xwidth = get_width(bounds[0], bounds[1])
-zwidth = get_width(bounds[2], bounds[3])
-        
-img = Image.new(mode='RGB',size=(xwidth*16*16,zwidth*16*16))
-
-# create dictionary
-# block id --> block texture
-textures = cropped_top_textures()
-
-#fallback image -- magenta
-fallback = Image.new('RGB', (16, 16), (255, 0, 255))
-
-for cx, cz, path in chunkdata:
-
-
-    blocks = load_chunk_blocks(path)
-    height = get_chunk_height(blocks)
-
-    for x in range(16):
-        for z in range(16):
-            block_id = get_top_block(blocks, x, z, height, transp_pixels) #change to transp for textures later
-
-            texture = textures.get(block_id, fallback) #fallback is diamond block because why not
-
-            img.paste(texture, ((cx-bounds[1])*16*16+x*16,(cz-bounds[3])*16*16+z*16))
-
-
-img.save('outputs/test2.png')
-
-#EXAMPLE OF GETTING TEXTURE FROM BLOCK NAME/ ID
-#testblock = 'plantBlue'
-
-#testid = NAME_TO_ID[testblock]
-#testTexture = get_block_texture(testid)
-#testTexture.save('outputs/test_texture.png')
-"""
-
-
-textures = cropped_top_textures()
-fallback = Image.new('RGB', (16, 16), (255, 0, 255))
-chunkdata = chunks_list(savepath)
-
-# filter chunks — adjust range to render more or less           #large region around base i used 0 - 60 and -45 - 15
-render_chunks = [(cx, cz, path) for cx, cz, path in chunkdata if 0 <= cx <= 60 and -45 <= cz <= 15]
-
-rc_xmin = min(c[0] for c in render_chunks)
-rc_xmax = max(c[0] for c in render_chunks)
-rc_zmin = min(c[1] for c in render_chunks)
-rc_zmax = max(c[1] for c in render_chunks)
-
-width = (rc_xmax - rc_xmin + 1) * 256
-height = (rc_zmax - rc_zmin + 1) * 256
-
-img = Image.new('RGB', (width, height))
-
-maxDepth = 0
-
-for cx, cz, path in render_chunks:
-    blocks = load_chunk_blocks(path)
-    h = get_chunk_height(blocks)
-
-    for x in range(16):
-        for z in range(16):
-            solidBlockID, transpBlockID, depthWater = get_top_view_blocks(blocks, x, z, h, skip_textures, layer_textures)
-
-            if depthWater > maxDepth:
-                maxDepth = depthWater
-
-            solidTexture = textures.get(solidBlockID, fallback)
-            transpTexture = textures.get(transpBlockID, fallback)
-            waterTexture = textures[8]
-            
-            #paste only solid texture if no water
-            if depthWater == 0:
-                img.paste(solidTexture, ((cx - rc_xmin) * 256 + x * 16, (cz - rc_zmin) * 256 + z * 16))
-
-            #if water depth between 0 and 10, render solid block then render darkened water
-            elif depthWater > 0:
-                solidRGBA = solidTexture.copy().convert('RGBA')
-                blackBG = Image.new('RGBA', (16, 16), (0, 0, 0, 255))
-                
-                # how much of the bottom you can see (fades to black with depth)
-                bottomFade = min(depthWater * 0.066, 1.0)
-                darkened = Image.blend(solidRGBA, blackBG, bottomFade)
-                
-                # blend darkened bottom with water texture
-                opaqueWater = Image.new('RGBA', (16, 16), (5, 10, 30, 255))
-                opaqueWater.paste(waterTexture, (0, 0), waterTexture)
-                
-                if depthWater > 14:
-                    brightness = max(1 - (depthWater - 14) * 0.03, 0.05)
-                    opaqueWater = ImageEnhance.Brightness(opaqueWater).enhance(brightness)
-
-                waterRatio = min(0.50 + depthWater * 0.02, 0.98)
-                blended = Image.blend(darkened, opaqueWater, waterRatio)
-                
-                img.paste(blended, ((cx - rc_xmin) * 256 + x * 16, (cz - rc_zmin) * 256 + z * 16))
-            
-                
-            #render transparent block on top of everything
-            if transpBlockID != 0:
-            
-                img.paste(transpTexture, ((cx - rc_xmin) * 256 + x * 16, (cz - rc_zmin) * 256 + z * 16), transpTexture)
-
-img.save('outputs/test_region.png')
-
-print(f"Deepest water: {maxDepth}")
-#create_pixel_map(transp_pixels)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+main()
