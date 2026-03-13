@@ -258,21 +258,21 @@ def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax,m
     #create image
     img = Image.new('RGB', (width, height))
 
+    waterTexture = textures[8]
+
+    #set brightness for day or night
+    if mode == "night":
+        brightnessFactor = 0.36
+    elif mode == "day":
+        brightnessFactor = 1.0
+    else:
+        brightnessFactor = 1.0   
 
     #loop through every file
     for cx, cz, path in render_chunks:
         #create usable array of chunkData and find worldHeight
         blocks = load_chunk_blocks(path)
         h = get_chunk_height(blocks)
-
-        #set brightness for day or night
-        if mode == "night":
-            brightnessFactor = 0.36
-        elif mode == "day":
-            brightnessFactor = 1.0
-        else:
-            brightnessFactor = 1.0
-        
 
         #loop through all x and z coordinates in chunk
         for x in range(16):
@@ -282,7 +282,6 @@ def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax,m
 
                 #convert block IDs to textures
                 solidTexture = textures.get(solidBlockID, fallback)
-                waterTexture = textures[8]
                 
                 #combine chunk coordinates (cx - rc_xmin)*16blocks*16pixels + block coordinates (x*16 pixels)
                 pastePosition = ((cx - rc_xmin) * 256 + x * 16, (cz - rc_zmin) * 256 + z * 16)
@@ -301,7 +300,7 @@ def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax,m
                 #if water depth > 0, use water rendering function to combine solid texture below, water above, and darkness based on depth
                 elif depthWater > 0:
                     shadedWater = ImageEnhance.Brightness(waterTexture.copy()).enhance(brightnessFactor)
-                    blended = render_water_top_down(shadedTexture, waterTexture, depthWater)
+                    blended = render_water_top_down(shadedTexture, shadedWater, depthWater)
                     img.paste(blended, pastePosition)
                 
                 #render transparent block on top of everything
