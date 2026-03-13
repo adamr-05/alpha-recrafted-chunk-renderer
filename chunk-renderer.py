@@ -3,7 +3,7 @@ from block_ids import BLOCK_NAMES
 NAME_TO_ID = {v: k for k, v in BLOCK_NAMES.items()}
 from block_color import BLOCK_COLORS
 from block_textures_top import BLOCK_TEXTURES_TOP
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 
 
@@ -17,7 +17,10 @@ savepath = "/home/arcadianvulture/chunk-renderer/world"
 #transparent blocks to skip         to see torches add/remove 50
 transp_pixels = {0, 6, 24, 30, 32, 37, 38, 39, 40, 50, 55, 63, 65, 66, 68, 69, 75, 76, 77}
 
+skip_textures = {0, 32, 51, 63, 64, 65, 71, 77, 85}
+layer_textures = {6, 18, 20, 23, 24, 27, 30, 37, 38, 39, 40, 50, 52, 55, 59, 66, 69, 70, 72, 75, 76, 83}
 
+#water is 8 and 9
 
 
 
@@ -71,6 +74,26 @@ def get_top_block(blocks, x, z, height, transp):
         if block_id not in transp:
             return block_id
     return 0
+
+#loops down from top y coordinate to bottom at (x, z) and returns topmost transparent block and topmost solid block (needs worldheight limit)
+def get_top_view_blocks(blocks, x, z, height, skipTextures, transpTextures):
+    transpBlock = 0
+    waterDepth = 0
+    for y in range(height - 1, -1, -1):
+        block_id = get_block_id(blocks, x, y, z, height)
+        if block_id == 0 or block_id in skipTextures:
+            continue
+        if block_id == 8 or block_id == 9:
+            waterDepth += 1
+            continue
+        if block_id in transpTextures:
+            if waterDepth == 0:
+                transpBlock = block_id
+            continue
+        solidBlock = block_id
+        return solidBlock, transpBlock, waterDepth
+    return 0, 0, 0
+
 
 
 #create array of tuplets with all chunks
@@ -233,7 +256,7 @@ textures = cropped_top_textures()
 fallback = Image.new('RGB', (16, 16), (255, 0, 255))
 chunkdata = chunks_list(savepath)
 
-# filter chunks — adjust range to render more or less
+# filter chunks — adjust range to render more or less           #large region around base i used 0 - 60 and -45 - 15
 render_chunks = [(cx, cz, path) for cx, cz, path in chunkdata if 0 <= cx <= 60 and -45 <= cz <= 15]
 
 rc_xmin = min(c[0] for c in render_chunks)
@@ -246,19 +269,59 @@ height = (rc_zmax - rc_zmin + 1) * 256
 
 img = Image.new('RGB', (width, height))
 
+maxDepth = 0
+
 for cx, cz, path in render_chunks:
     blocks = load_chunk_blocks(path)
     h = get_chunk_height(blocks)
 
     for x in range(16):
         for z in range(16):
-            block_id = get_top_block(blocks, x, z, h, transp_pixels)
-            texture = textures.get(block_id, fallback)
-            img.paste(texture, ((cx - rc_xmin) * 256 + x * 16, (cz - rc_zmin) * 256 + z * 16))
+            solidBlockID, transpBlockID, depthWater = get_top_view_blocks(blocks, x, z, h, skip_textures, layer_textures)
+
+            if depthWater > maxDepth:
+                maxDepth = depthWater
+
+            solidTexture = textures.get(solidBlockID, fallback)
+            transpTexture = textures.get(transpBlockID, fallback)
+            waterTexture = textures[8]
+            
+            #paste only solid texture if no water
+            if depthWater == 0:
+                img.paste(solidTexture, ((cx - rc_xmin) * 256 + x * 16, (cz - rc_zmin) * 256 + z * 16))
+
+            #if water depth between 0 and 10, render solid block then render darkened water
+            elif depthWater > 0:
+                solidRGBA = solidTexture.copy().convert('RGBA')
+                blackBG = Image.new('RGBA', (16, 16), (0, 0, 0, 255))
+                
+                # how much of the bottom you can see (fades to black with depth)
+                bottomFade = min(depthWater * 0.066, 1.0)
+                darkened = Image.blend(solidRGBA, blackBG, bottomFade)
+                
+                # blend darkened bottom with water texture
+                opaqueWater = Image.new('RGBA', (16, 16), (5, 10, 30, 255))
+                opaqueWater.paste(waterTexture, (0, 0), waterTexture)
+                
+                if depthWater > 14:
+                    brightness = max(1 - (depthWater - 14) * 0.03, 0.05)
+                    opaqueWater = ImageEnhance.Brightness(opaqueWater).enhance(brightness)
+
+                waterRatio = min(0.50 + depthWater * 0.02, 0.98)
+                blended = Image.blend(darkened, opaqueWater, waterRatio)
+                
+                img.paste(blended, ((cx - rc_xmin) * 256 + x * 16, (cz - rc_zmin) * 256 + z * 16))
+            
+                
+            #render transparent block on top of everything
+            if transpBlockID != 0:
+            
+                img.paste(transpTexture, ((cx - rc_xmin) * 256 + x * 16, (cz - rc_zmin) * 256 + z * 16), transpTexture)
 
 img.save('outputs/test_region.png')
 
-create_pixel_map(transp_pixels)
+print(f"Deepest water: {maxDepth}")
+#create_pixel_map(transp_pixels)
 
 
 
