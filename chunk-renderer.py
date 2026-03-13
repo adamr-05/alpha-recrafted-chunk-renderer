@@ -1,8 +1,8 @@
 import os, gzip
-from block_ids import BLOCK_NAMES
+from data.block_ids import BLOCK_NAMES
 NAME_TO_ID = {v: k for k, v in BLOCK_NAMES.items()}
-from block_color import BLOCK_COLORS
-from block_textures_top import BLOCK_TEXTURES_TOP
+from data.block_color import BLOCK_COLORS
+from data.block_textures_top import BLOCK_TEXTURES_TOP
 from PIL import Image, ImageEnhance
 
 
@@ -21,9 +21,6 @@ skip_textures = {0, 32, 51, 63, 64, 65, 71, 77, 85}
 layer_textures = {6, 18, 20, 23, 24, 27, 30, 37, 38, 39, 40, 50, 52, 55, 59, 66, 69, 70, 72, 75, 76, 83}
 
 #water is 8 and 9
-
-
-
 
 
 
