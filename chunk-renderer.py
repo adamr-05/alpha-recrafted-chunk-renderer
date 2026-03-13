@@ -233,25 +233,32 @@ textures = cropped_top_textures()
 fallback = Image.new('RGB', (16, 16), (255, 0, 255))
 chunkdata = chunks_list(savepath)
 
-# only keep chunks within 5 of spawn in each direction
-render_chunks = [(cx, cz, path) for cx, cz, path in chunkdata if -20 <= cx <= 20 and -20 <= cz <= 20]
+# filter chunks — adjust range to render more or less
+render_chunks = [(cx, cz, path) for cx, cz, path in chunkdata if 0 <= cx <= 60 and -45 <= cz <= 15]
 
-# image size based on the filtered region
-img = Image.new('RGB', (41 * 256, 41 * 256))
+rc_xmin = min(c[0] for c in render_chunks)
+rc_xmax = max(c[0] for c in render_chunks)
+rc_zmin = min(c[1] for c in render_chunks)
+rc_zmax = max(c[1] for c in render_chunks)
+
+width = (rc_xmax - rc_xmin + 1) * 256
+height = (rc_zmax - rc_zmin + 1) * 256
+
+img = Image.new('RGB', (width, height))
 
 for cx, cz, path in render_chunks:
     blocks = load_chunk_blocks(path)
-    height = get_chunk_height(blocks)
+    h = get_chunk_height(blocks)
 
     for x in range(16):
         for z in range(16):
-            block_id = get_top_block(blocks, x, z, height, transp_pixels)
+            block_id = get_top_block(blocks, x, z, h, transp_pixels)
             texture = textures.get(block_id, fallback)
-            img.paste(texture, ((cx + 5) * 256 + x * 16, (cz + 5) * 256 + z * 16))
+            img.paste(texture, ((cx - rc_xmin) * 256 + x * 16, (cz - rc_zmin) * 256 + z * 16))
 
 img.save('outputs/test_region.png')
 
-
+create_pixel_map(transp_pixels)
 
 
 
