@@ -1,98 +1,255 @@
 import os, gzip, re
 from block_ids import BLOCK_NAMES
+NAME_TO_ID = {v: k for k, v in BLOCK_NAMES.items()}
 from block_color import BLOCK_COLORS
+from block_textures_top import BLOCK_TEXTURES_TOP
 from PIL import Image
 
-#----------- helper functions -----------#
-
-#detect if chunk uses 128 or 256 world height
-#checks a specific block that should be bedrock in 128 world height and should not be in 256 world height
-def get_chunk_height(blocks):
-    if blocks[128] == 7:
-        return 128
-    return 256
-
-#grab block id of array given coords and (world height 128 or 256)
-def get_block(blocks, x, y, z, height):
-    return blocks[y + z * height + x * height * 16]
 
 
-#loops down from top y coordinate to bottom (at x, z) finding first non air block (needs world height limit)
-def get_top_block(blocks, x, z, height):
-    for y in range(height - 1, -1, -1):
-        block_id = get_block(blocks, x, y, z, height)
-        if block_id not in transp:
-            return block_id
-    return 0
-
-#----------- ---------------- -----------#
-
-
-
-
+#==========================
+#------- CONSTANTS -------#
+#==========================
 
 #WORLD SAVE PATH
 savepath = "/home/arcadianvulture/chunk-renderer/world"
 
 #transparent blocks to skip         to see torches add/remove 50
-transp = {0, 6, 24, 30, 32, 37, 38, 39, 40, 50, 55, 63, 65, 66, 68, 69, 75, 76, 77}
+transp_pixels = {0, 6, 24, 30, 32, 37, 38, 39, 40, 50, 55, 63, 65, 66, 68, 69, 75, 76, 77}
 
-#==================================================================================
-#create array of tuplets
+
+
+
+
+
+
+
+#=========================================
+#----------- helper functions -----------#
+#=========================================
+
+
+#get the block texture given a block id
+#opens the terrain.png image and uses an indexing map to get location, calculates topLeft and bottomRight pixels, and crops new iamge
+
+def get_block_texture(block_id):
+    with Image.open("terrain.png") as im:
+        texindex = BLOCK_TEXTURES_TOP[block_id]
+        trow = texindex // 16
+        tcol = texindex % 16
+        pixelx = tcol*16
+        pixely = trow*16
+        topLeft = (pixelx, pixely)
+        pixelx2 = pixelx + 16
+        pixely2 = pixely + 16
+        bottomRight = (pixelx2, pixely2)
+        cropTuple = topLeft + bottomRight
+        blockTexture = im.crop(cropTuple)
+        return blockTexture
+
+
+#detect if chunk uses 128 or 256 world height
+#checks a specific block that should be bedrock in 128 world height and should not be in 256 world height
+
+def get_chunk_height(blocks):
+    if blocks[128] == 7:
+        return 128
+    return 256
+
+
+#grab block id of array given coords and (world height 128 or 256)
+
+def get_block_id(blocks, x, y, z, height):
+    return blocks[y + z * height + x * height * 16]
+
+
+#loops down from top y coordinate to bottom (at x, z) finding first non air block (needs world height limit)
+
+def get_top_block(blocks, x, z, height, transp):
+    for y in range(height - 1, -1, -1):
+        block_id = get_block_id(blocks, x, y, z, height)
+        if block_id not in transp:
+            return block_id
+    return 0
+
+
+#create array of tuplets with all chunks
 #format:  chunks[0][(x,z,path)]         chunks[0][1] gives 0th element z coordinate
-#==================================================================================
-chunks = []
-for root, dirs, files in os.walk(savepath):
-    for f in files:
-        if f.startswith('c.') and f.endswith ('.dat'):
-            parts = f.split('.')
-            x = int(parts[1], 36)
-            z = int(parts[2], 36)
-            path = os.path.join(root, f)
-            chunks.append((x, z, path))
 
-#----------------------------------------------------------------------------------
-#get image size
-#----------------------------------------------------------------------------------
-x_coords = [x[0] for x in chunks]
-xmin = (min(x_coords))
-xmax = (max(x_coords))
-z_coords = [z[1] for z in chunks]
-zmin = (min(z_coords))
-zmax = (max(z_coords))
-
-xwidth = xmax-xmin + 1
-zwidth = zmax-zmin + 1
-
-#create 2d image of width and height of worldsave
-img = Image.new(mode='RGB',size=(xwidth*16,zwidth*16))
+def chunks_list(spath):
+    chunks = []
+    for root, dirs, files in os.walk(spath):
+        for f in files:
+            if f.startswith('c.') and f.endswith ('.dat'):
+                parts = f.split('.')
+                x = int(parts[1], 36)
+                z = int(parts[2], 36)
+                path = os.path.join(root, f)
+                chunks.append((x, z, path))
+    return chunks
 
 
-for cx, cz, path in chunks:
+#gives the max and min x and z chunk coordinates for a given chunkslist                     chunks are 16 blocks
+#takes a chunkslist given from chunks_list function and returns (xmax, xmin, zmax, zmin)    CHUNK, NOT BLOCK COORDINATES
 
-    #put usable chunk data in array "blocks"
-    #format:    blocks[0] = (byte of block id)
+def bounding_box_chunks(chunks):
+    x_coords = [x[0] for x in chunks]
+    xmin = (min(x_coords))
+    xmax = (max(x_coords))
+    z_coords = [z[1] for z in chunks]
+    zmin = (min(z_coords))
+    zmax = (max(z_coords))
+    return xmax, xmin, zmax, zmin
+
+
+#returns width given max and min
+def get_width(max,min):
+    width = (max - min) + 1
+    return width
+
+
+#open chunk file and extract usable data
+        #every byte is a block id
+def load_chunk_blocks(path):
     with gzip.open(path) as f:
         data = f.read()
-    idx = data.find(b'Blocks')
-    blocksStart = idx + 10
-    blocks = data[blocksStart:blocksStart + 65536]
 
-    #get height (256 or 128...use different indexing methods)
+    #usable data begins at 35th byte (beginning is metadata/text)
+    blocksStart = 35
+    blocks = data[blocksStart:blocksStart + 65536] #65536 is the length of usable chunk data (16*16*255)
+    return blocks
+
+
+#creates a dictionary where block ID gives blocks top texture
+def cropped_top_textures():
+    croppedTextures = {}
+    with Image.open("terrain.png") as terrainimage:
+        for blockID, textureID in BLOCK_TEXTURES_TOP.items():
+            texindex = textureID
+            trow = texindex // 16
+            tcol = texindex % 16
+            pixelx = tcol*16
+            pixely = trow*16
+            topLeft = (pixelx, pixely)
+            pixelx2 = pixelx + 16
+            pixely2 = pixely + 16
+            bottomRight = (pixelx2, pixely2)
+            cropTuple = topLeft + bottomRight
+            blockTexture = terrainimage.crop(cropTuple)
+            croppedTextures[blockID] = blockTexture
+    return croppedTextures
+
+
+
+#==========================================
+#----------- MAPPING FUNCTIONS -----------#
+#==========================================
+
+#create map where every block is 1 pixel
+def create_pixel_map(transp_pixels):
+    
+    #using helper functions, get list of chunks and bounding box coordinates
+    chunkdata = chunks_list(savepath)
+    bounds = bounding_box_chunks(chunkdata)
+    xwidth = get_width(bounds[0], bounds[1])
+    zwidth = get_width(bounds[2], bounds[3])
+
+    #create new image based on bounding box size * 16 for a chunk being 16x16 pixels (RGB color space)
+    img = Image.new(mode='RGB',size=(xwidth*16,zwidth*16))
+
+
+    #loop across every file in chunkdata
+    for cx, cz, path in chunkdata:
+
+        #for each path, load chunkData into blocks array
+        blocks = load_chunk_blocks(path)
+
+        #get height of chunk (world height affects indexing)
+        height = get_chunk_height(blocks)
+
+
+        #loop chunk files x and z coordinates
+        for x in range(16):
+            for z in range(16):
+                #only show top block
+                block_id = get_top_block(blocks, x, z, height, transp_pixels)
+
+                #get color of obtained block id
+                #if invalid, magenta
+                color = BLOCK_COLORS.get(block_id, (255, 0, 255))
+
+                #place pixels in calculated chunk + chunk position with specified color
+                img.putpixel(((cx-bounds[1])*16+x,(cz-bounds[3])*16+z), color)
+
+    img.save('outputs/test1.png')
+    return
+#=======================================================================================
+
+
+
+
+"""
+chunkdata = chunks_list(savepath)
+bounds = bounding_box_chunks(chunkdata)
+xwidth = get_width(bounds[0], bounds[1])
+zwidth = get_width(bounds[2], bounds[3])
+        
+img = Image.new(mode='RGB',size=(xwidth*16*16,zwidth*16*16))
+
+# create dictionary
+# block id --> block texture
+textures = cropped_top_textures()
+
+#fallback image -- magenta
+fallback = Image.new('RGB', (16, 16), (255, 0, 255))
+
+for cx, cz, path in chunkdata:
+
+
+    blocks = load_chunk_blocks(path)
     height = get_chunk_height(blocks)
-
 
     for x in range(16):
         for z in range(16):
-            block_id = get_top_block(blocks, x, z, height)
-            color = BLOCK_COLORS.get(block_id, (255, 0, 255))
+            block_id = get_top_block(blocks, x, z, height, transp_pixels) #change to transp for textures later
 
-            img.putpixel(((cx-xmin)*16+x,(cz-zmin)*16+z), color)
+            texture = textures.get(block_id, fallback) #fallback is diamond block because why not
 
-
-img.save('outputs/test1.png')
+            img.paste(texture, ((cx-bounds[1])*16*16+x*16,(cz-bounds[3])*16*16+z*16))
 
 
+img.save('outputs/test2.png')
+
+#EXAMPLE OF GETTING TEXTURE FROM BLOCK NAME/ ID
+#testblock = 'plantBlue'
+
+#testid = NAME_TO_ID[testblock]
+#testTexture = get_block_texture(testid)
+#testTexture.save('outputs/test_texture.png')
+"""
+
+
+textures = cropped_top_textures()
+fallback = Image.new('RGB', (16, 16), (255, 0, 255))
+chunkdata = chunks_list(savepath)
+
+# only keep chunks within 5 of spawn in each direction
+render_chunks = [(cx, cz, path) for cx, cz, path in chunkdata if -20 <= cx <= 20 and -20 <= cz <= 20]
+
+# image size based on the filtered region
+img = Image.new('RGB', (41 * 256, 41 * 256))
+
+for cx, cz, path in render_chunks:
+    blocks = load_chunk_blocks(path)
+    height = get_chunk_height(blocks)
+
+    for x in range(16):
+        for z in range(16):
+            block_id = get_top_block(blocks, x, z, height, transp_pixels)
+            texture = textures.get(block_id, fallback)
+            img.paste(texture, ((cx + 5) * 256 + x * 16, (cz + 5) * 256 + z * 16))
+
+img.save('outputs/test_region.png')
 
 
 
@@ -101,48 +258,29 @@ img.save('outputs/test1.png')
 
 
 
-#put invidual file in data var
-
-#open chunk file, name it "f", and use "f.read()", setting data variable to content in file
-
-# with gzip.open('./test_chunk_data/c.0.-1s.dat','rb') as f:
-#     data = f.read()
 
 
 
 
 
-#create array of usable chunk data (not parsed)
-
-#index to start searching chunk data  (first 10 chars are text/info)
-
-# idx = data.find(b'Blocks')
-# blocksStart = idx + 10
-# #blocks is chunk file from start index to end
-# blocks = data[blocksStart:blocksStart + 65536]
 
 
 
 
-#find height of current chunk
-
-# height = get_chunk_height(blocks)
-
-#create image with RGB color space, 16x16 pixels
-# img = Image.new(mode='RGB', size=(16,16))
 
 
-# for x in range(16):
-#     for z in range(16):
-#         block_id = get_top_block(blocks, x, z, height)
-#         if block_id != 0:
-#             #print(block_id)
-#             #print('done')
-#             color = BLOCK_COLORS.get(block_id, (255, 0, 255))
-#             img.putpixel((x,z), color)
 
-               
-# img.save('outputs/output.png')
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -62,7 +62,7 @@ BLOCK_NAMES = {
 
     56: "oreDiamond",
     57: "blockDiamond",
-    58: "craftingtable",
+    58: "craftingTable",
     59: "crops",
     60: "tilledField",
     61: "furnaceOff",
