@@ -58,7 +58,7 @@ def get_top_block(blocks, x, z, height, transp):
 
 #loops down from top y coordinate to bottom at (x, z) and returns topmost transparent block and topmost solid block (needs worldheight limit)
 def get_top_view_blocks(blocks, x, z, height, skipTextures, transpTextures):
-    transpBlock = 0
+    transpBlocks = []
     waterDepth = 0
     for y in range(height - 1, -1, -1):
         block_id = get_block_id(blocks, x, y, z, height)
@@ -69,11 +69,12 @@ def get_top_view_blocks(blocks, x, z, height, skipTextures, transpTextures):
             continue
         if block_id in transpTextures:
             if waterDepth == 0:
-                transpBlock = block_id
+                transpBlocks.append(block_id)
             continue
         solidBlock = block_id
-        return solidBlock, transpBlock, waterDepth
-    return 0, 0, 0
+        elevation = y
+        return elevation, solidBlock, transpBlocks, waterDepth
+    return 0, 0, [], 0
 
 
 #create array of tuplets with all chunks
@@ -227,12 +228,17 @@ def create_pixel_map(savepath, transp_pixels):
 
 
 
+
+
+
+
+
 #------------------------------------------------
 #create top-down world map using topface textures
 #transparent blocks, water depth added
 #------------------------------------------------
 
-def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax):
+def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax,mode):
 
     #get array of textures from block id & create list of all chunks
     textures = cropped_top_textures()
@@ -259,33 +265,56 @@ def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax):
         blocks = load_chunk_blocks(path)
         h = get_chunk_height(blocks)
 
+        #set brightness for day or night
+        if mode == "night":
+            brightnessFactor = 0.36
+        elif mode == "day":
+            brightnessFactor = 1.0
+        else:
+            brightnessFactor = 1.0
+        
+
         #loop through all x and z coordinates in chunk
         for x in range(16):
             for z in range(16):
                 #get topview blocks for given x and z coordinate
-                solidBlockID, transpBlockID, depthWater = get_top_view_blocks(blocks, x, z, h, skipTextures, layerTextures)
+                elevation, solidBlockID, transpBlocks, depthWater = get_top_view_blocks(blocks, x, z, h, skipTextures, layerTextures)
 
                 #convert block IDs to textures
                 solidTexture = textures.get(solidBlockID, fallback)
-                transpTexture = textures.get(transpBlockID, fallback)
                 waterTexture = textures[8]
                 
                 #combine chunk coordinates (cx - rc_xmin)*16blocks*16pixels + block coordinates (x*16 pixels)
                 pastePosition = ((cx - rc_xmin) * 256 + x * 16, (cz - rc_zmin) * 256 + z * 16)
                 
+                #shade solidTexture based on elevation
+                if mode == "height":
+                    brightnessFactor = max(min((64-elevation)/144 + 1.0, 1.3),0.6)
+
+                shadedTexture = ImageEnhance.Brightness(solidTexture.copy()).enhance(brightnessFactor)
+
+
                 #paste only solid texture if no water
                 if depthWater == 0:
-                    img.paste(solidTexture, (pastePosition))
+                    img.paste(shadedTexture, (pastePosition))
 
                 #if water depth > 0, use water rendering function to combine solid texture below, water above, and darkness based on depth
                 elif depthWater > 0:
-                    blended = render_water_top_down(solidTexture, waterTexture, depthWater)
+                    shadedWater = ImageEnhance.Brightness(waterTexture.copy()).enhance(brightnessFactor)
+                    blended = render_water_top_down(shadedTexture, waterTexture, depthWater)
                     img.paste(blended, pastePosition)
                 
                 #render transparent block on top of everything
-                if transpBlockID != 0:
-                    img.paste(transpTexture, pastePosition, transpTexture)
+                if len(transpBlocks) > 0:
+                    for texid in reversed(transpBlocks):
+                        transpTexture = textures.get(texid, fallback)
+                        transpTexture = ImageEnhance.Brightness(transpTexture.copy()).enhance(brightnessFactor)
+                        img.paste(transpTexture, pastePosition, transpTexture)
 
+
+    if mode == "night":
+        nightOverlay = Image.new('RGB', img.size, (4,4,18))
+        img = Image.blend(img, nightOverlay, 0.60)
     img.save('outputs/test_region.png')
     return
 
@@ -299,8 +328,8 @@ def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax):
 #=======================================================================================
 
 def main():
-    create_pixel_map(currentsavepath,transp_pixels)
-    create_texture_map(currentsavepath,skip_textures,layer_textures,0,60,-45,15)
+    #create_pixel_map(currentsavepath,transp_pixels)        i did 0 60 -45 15
+    create_texture_map(currentsavepath,skip_textures,layer_textures,10,50,-35,5,"night")
     return
 
 
