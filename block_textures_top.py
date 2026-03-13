@@ -9,8 +9,9 @@ BLOCK_TEXTURES_TOP = {
     7: 17, #bedrock
 
     #Textures animated in-game
-    8: 205, #waterMoving
-    9: 205, #waterStill
+    8: 205, #waterMoving    /t
+    9: 205, #waterStill     /t
+    
     10: 237, #lavaMoving
     11: 237, #lavaStill
 
@@ -29,10 +30,10 @@ BLOCK_TEXTURES_TOP = {
     24: 14, #blueplant  /t
     25: 62, #unlitLamp
     26: 78, #litLamp
-    27: 22, #ironPressurePlate  /t ????
+    27: 22, #ironPressurePlate  /t
     28: 64, #cryingobsidian
     29: 76, #coral
-    30: 77, #deadBush
+    30: 77, #deadBush           /t
 
     #need metadata for colors
     31: 175, #coloredBricks
@@ -73,7 +74,7 @@ BLOCK_TEXTURES_TOP = {
     58: 43, #workbench
 
     #need metadata for growth stage
-    59: 88, #crops -- default seeds     /t
+    59: 88, #crops -- default seeds     /t      special case
 
     #need metadata
     60: 87, #farmland (wet = 86)
@@ -92,7 +93,7 @@ BLOCK_TEXTURES_TOP = {
     67: 16, #cobblestoneStairs
 
     #SKIP
-    68: 4, #wallSign
+    68: 4, #wallSign        /t
 
     #need metadata for direction
     69: 96, #lever          /t
@@ -108,10 +109,10 @@ BLOCK_TEXTURES_TOP = {
     74: 51, #redstoneOreGlowing
 
     #need metadata for state (position)
-    75: 115, #redstoneTorchOff
-    76: 99, #redstoneTorchOn
+    75: 115, #redstoneTorchOff      /t
+    76: 99, #redstoneTorchOn        /t
 
-    #SKIP
+    #SKIP need metadata
     77: 1, #button          /t
 
     78: 66, #snowLayer
@@ -124,7 +125,7 @@ BLOCK_TEXTURES_TOP = {
     84: 75, #jukebox
 
     #SKIP
-    85: 4, #fence        /t
+    85: 4, #fence        /t         special case, need special texture
     
 
 
