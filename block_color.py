@@ -18,7 +18,7 @@ BLOCK_COLORS = {
 
     16: (48, 48, 48), #coalOre
     17: (74, 46, 9), #woodLog
-    18: (10, 115, 0), #leaves
+    18: (10, 110, 0), #leaves
     19: (202, 203, 76), #sponge
     20: (157,187,192), #glass
     21: (20, 20, 20), #coalBlock
