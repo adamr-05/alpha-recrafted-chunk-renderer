@@ -3,3 +3,4 @@ __pycache__/
 test_chunk_data/
 outputs/
 world/
+settings.json
