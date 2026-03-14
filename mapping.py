@@ -39,7 +39,7 @@ def create_pixel_map(savepath, transp_pixels):
 #transparent blocks, water depth added
 #------------------------------------------------
 
-def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax,mode):
+def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax,mode,progress=None,window=None,progressLabel=None):
     textures = cropped_top_textures()
     torchVariants = create_torch_topdown(textures)  # dictionary of meta -> image
     railVariants = create_rail_topdown(textures)
@@ -67,12 +67,13 @@ def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax,m
         brightnessFactor = 1.0   
 
     total = len(render_chunks)
-    barLength = 30
     for i, (cx, cz, path) in enumerate(render_chunks):
-        percent = (i + 1) * 100 // total
-        filled = (i + 1) * barLength // total
-        bar = '█' * filled + '░' * (barLength - filled)
-        print(f'\r[{bar}] {percent}%', end='')
+        if progress and window:
+            percent = (i + 1) * 100 // total
+            progress['value'] = percent
+            if progressLabel:
+                progressLabel.config(text=f"{i+1}/{total} ({percent}%)")
+            window.update()
     
         blocks, meta = load_chunk_blocks(path)
         h = get_chunk_height(blocks)
@@ -111,7 +112,11 @@ def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax,m
         nightOverlay = Image.new('RGB', img.size, (4,4,18))
         img = Image.blend(img, nightOverlay, 0.60)
 
-    print("Saving image...")
+    if progressLabel and window:
+        progressLabel.config(text="Saving image...")
+        window.update()
     img.save('outputs/test_region.png')
-    print("Done!")
+    if progressLabel and window:
+        progressLabel.config(text="Done!")
+        window.update()
     return
