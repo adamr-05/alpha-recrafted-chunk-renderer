@@ -38,7 +38,19 @@ def get_width(max,min):
 def load_chunk_blocks(path):
     with gzip.open(path) as f:
         data = f.read()
+
     #usable data begins at 35th byte (beginning is metadata/text)
     blocksStart = 35
     blocks = data[blocksStart:blocksStart + 65536] #65536 is the length of usable chunk data (16*16*255)
-    return blocks
+
+    height = 128 if blocks[128] == 7 else 256
+    if height == 128:
+        dataIdx = 65896 + 11
+        metaLength = 16384
+    else:
+        dataIdx = 131432 + 11
+        metaLength = 32768
+    
+    metadata = data[dataIdx:dataIdx + metaLength]
+
+    return blocks, metadata

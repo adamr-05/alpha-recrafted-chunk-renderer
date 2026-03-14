@@ -58,7 +58,6 @@ BLOCK_NAMES = {
     53: "stairWooden",
     54: "chest",
     55: "redstoneDust",
-    
 
     56: "oreDiamond",
     57: "blockDiamond",

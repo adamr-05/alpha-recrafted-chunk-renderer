@@ -22,7 +22,7 @@ def get_top_block(blocks, x, z, height, transp):
 
 
 #loops down from top y coordinate to bottom at (x, z) and returns topmost transparent block and topmost solid block (needs worldheight limit)
-def get_top_view_blocks(blocks, x, z, height, skipTextures, transpTextures):
+def get_top_view_blocks(blocks, meta, x, z, height, skipTextures, transpTextures):
     transpBlocks = []
     waterDepth = 0
     for y in range(height - 1, -1, -1):
@@ -34,9 +34,19 @@ def get_top_view_blocks(blocks, x, z, height, skipTextures, transpTextures):
             continue
         if block_id in transpTextures:
             if waterDepth == 0:
-                transpBlocks.append(block_id)
+                metaval = get_metadata_value(meta, x, y, z, height)
+                transpBlocks.append((block_id, metaval))
             continue
-        solidBlock = block_id
         elevation = y
-        return elevation, solidBlock, transpBlocks, waterDepth
+        return elevation, block_id, transpBlocks, waterDepth
     return 0, 0, [], 0
+
+def get_metadata_value(meta, x, y, z, height):
+    blockIndex = y + z * height + x * height * 16
+    byteIndex = blockIndex // 2
+    byte = meta[byteIndex]
+
+    if blockIndex % 2 == 0:
+        return byte  & 0x0F
+    else:
+        return (byte >> 4) & 0x0F

@@ -19,7 +19,7 @@ def create_pixel_map(savepath, transp_pixels):
     img = Image.new(mode='RGB',size=(xwidth*16,zwidth*16))
 
     for cx, cz, path in chunkdata:
-        blocks = load_chunk_blocks(path)
+        blocks, meta = load_chunk_blocks(path)
         height = get_chunk_height(blocks) # world height affects chunk indexing
         for x in range(16):
             for z in range(16):
@@ -41,6 +41,10 @@ def create_pixel_map(savepath, transp_pixels):
 
 def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax,mode):
     textures = cropped_top_textures()
+    torchVariants = create_torch_topdown(textures)  # dictionary of meta -> image
+    railVariants = create_rail_topdown(textures)
+    for plantID in [6, 24, 30, 37, 38, 39, 40, 83]:
+        textures[plantID] = create_plant_topdown(textures,plantID)
     fallback = Image.new('RGB', (16, 16), (255, 0, 255)) #if block has no texture - magenta
     chunkdata = chunks_list(savepath)
     waterTexture = textures[8]#preset water texture for quicker rendering
@@ -62,12 +66,19 @@ def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax,m
     else:
         brightnessFactor = 1.0   
 
-    for cx, cz, path in render_chunks:
-        blocks = load_chunk_blocks(path)
+    total = len(render_chunks)
+    barLength = 30
+    for i, (cx, cz, path) in enumerate(render_chunks):
+        percent = (i + 1) * 100 // total
+        filled = (i + 1) * barLength // total
+        bar = '█' * filled + '░' * (barLength - filled)
+        print(f'\r[{bar}] {percent}%', end='')
+    
+        blocks, meta = load_chunk_blocks(path)
         h = get_chunk_height(blocks)
         for x in range(16):
             for z in range(16):
-                elevation, solidBlockID, transpBlocks, depthWater = get_top_view_blocks(blocks, x, z, h, skipTextures, layerTextures)
+                elevation, solidBlockID, transpBlocks, depthWater = get_top_view_blocks(blocks, meta, x, z, h, skipTextures, layerTextures)
                 solidTexture = textures.get(solidBlockID, fallback)
                 
                 #combine chunk coordinates (cx - rc_xmin)*16blocks*16pixels + block coordinates (x*16 pixels)
@@ -86,14 +97,21 @@ def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax,m
                     img.paste(blended, pastePosition)
 
                 if len(transpBlocks) > 0: #render transparent block on top
-                    for texid in reversed(transpBlocks):
-                        transpTexture = textures.get(texid, fallback)
+                    for blockID, metaval in reversed(transpBlocks):
+                        if blockID == 66:
+                            transpTexture = railVariants.get(metaval, railVariants[0])
+                        elif blockID == 50:
+                            transpTexture = torchVariants.get(metaval, torchVariants[5])
+                        else:
+                            transpTexture = textures.get(blockID, fallback)
                         transpTexture = ImageEnhance.Brightness(transpTexture.copy()).enhance(brightnessFactor)
                         img.paste(transpTexture, pastePosition, transpTexture)
-
+    print()
     if mode == "night": #overlay final image with dark blue image ("night-tint")
         nightOverlay = Image.new('RGB', img.size, (4,4,18))
         img = Image.blend(img, nightOverlay, 0.60)
-        
+
+    print("Saving image...")
     img.save('outputs/test_region.png')
+    print("Done!")
     return
