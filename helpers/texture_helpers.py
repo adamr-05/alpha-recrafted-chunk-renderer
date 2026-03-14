@@ -4,7 +4,7 @@ from data.block_textures_top import BLOCK_TEXTURES_TOP
 #creates a dictionary where block ID gives blocks topface texture
 def cropped_top_textures():
     croppedTextures = {}
-    with Image.open("terrain.png") as terrainimage:
+    with Image.open("data/terrain.png") as terrainimage:
         for blockID, textureID in BLOCK_TEXTURES_TOP.items():
             texindex = textureID
             trow = texindex // 16
@@ -82,7 +82,7 @@ def create_torch_topdown(textures):
 def create_plant_topdown(textures, blockID, size=14):
     plantTex = textures[blockID]
     topDown = Image.new('RGBA', (16, 16), (0, 0, 0, 0))
-    shrunk = plantTex.copy().resize((size, size), Image.NEAREST) # type: ignore
+    shrunk = plantTex.copy().resize((size, size), Image.Resampling.NEAREST)
     offset = (16 - size) // 2
     topDown.paste(shrunk, (offset, offset), shrunk)
     return topDown
@@ -91,7 +91,7 @@ def create_plant_topdown(textures, blockID, size=14):
 def create_rail_topdown(textures):
     straightTex = textures[66]
     
-    with Image.open("terrain.png") as terrainimage:
+    with Image.open("data/terrain.png") as terrainimage:
         row = 112 // 16
         col = 112 % 16
         curveTex = terrainimage.crop((col*16, row*16, col*16+16, row*16+16))
