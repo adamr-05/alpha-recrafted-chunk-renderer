@@ -71,9 +71,8 @@ def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax,m
         if progress and window:
             percent = (i + 1) * 100 // total
             progress['value'] = percent
-            if progressLabel:
-                progressLabel.config(text=f"{i+1}/{total} ({percent}%)")
-            window.update()
+        else:
+            print(f"\r{i+1}/{total} ({(i+1)*100//total}%)", end="")
     
         blocks, meta = load_chunk_blocks(path)
         h = get_chunk_height(blocks)
@@ -112,11 +111,7 @@ def create_texture_map(savepath,skipTextures,layerTextures,xmin,xmax,zmin,zmax,m
         nightOverlay = Image.new('RGB', img.size, (4,4,18))
         img = Image.blend(img, nightOverlay, 0.60)
 
-    if progressLabel and window:
-        progressLabel.config(text="Saving image...")
-        window.update()
+    print("Saving image...")
     img.save('outputs/test_region.png')
-    if progressLabel and window:
-        progressLabel.config(text="Done!")
-        window.update()
+    print("Done!")
     return

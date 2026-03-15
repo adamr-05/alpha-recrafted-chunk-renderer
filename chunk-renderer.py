@@ -1,4 +1,8 @@
 from mapping import *
+from PIL import Image,ImageEnhance,ImageChops,ImageTk
+import tkinter as tk
+from tkinter import ttk
+from ui import ChunkRendererGUI
 
 
 #==========================
@@ -23,7 +27,14 @@ layer_textures = {6, 18, 20, 23, 24, 27, 30, 37, 38, 39, 40, 50, 52, 55, 59, 66,
 #=======================================================================================
 
 def main():
-    create_texture_map(currentsavepath,skip_textures,layer_textures,120,200,-25,25,"height")
-    return
+    #create_texture_map(currentsavepath,skip_textures,layer_textures,120,200,-25,25,"height")
+
+    gui = Image.open('data/gui.png')
+    normal_btn = gui.crop((0, 66, 200, 86))
+    normal_btn.save('outputs/test_button.png')
+
+    ui = ChunkRendererGUI()
+    ui.run()
+
 
 main()
